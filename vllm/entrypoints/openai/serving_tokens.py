@@ -66,9 +66,13 @@ class ServingTokens(OpenAIServing):
         request: GenerateRequest,
         raw_request: Request | None = None
     ) -> GenerateResponse | ErrorResponse:
+        # Generate request_id early for error logging
+        request_id = "generate-tokens-" \
+                     f"{self._base_request_id(raw_request, request.request_id)}"
+
         error_check_ret = await self._check_model(request)
         if error_check_ret is not None:
-            logger.error("Error with model %s", error_check_ret)
+            logger.error("[%s] Error with model %s", request_id, error_check_ret)
             return error_check_ret
 
         # If the engine is dead, raise the engine's DEAD_ERROR.
@@ -82,9 +86,6 @@ class ServingTokens(OpenAIServing):
             supports_default_mm_loras=True)
 
         model_name = self.models.model_name(lora_request)
-
-        request_id = "generate-tokens-" \
-                     f"{self._base_request_id(raw_request, request.request_id)}"
 
         request_metadata = RequestResponseMetadata(request_id=request_id)
         if raw_request:

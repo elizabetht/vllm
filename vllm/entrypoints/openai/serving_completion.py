@@ -134,16 +134,16 @@ class OpenAIServingCompletion(OpenAIServing):
                 config=self._build_render_config(request),
             )
         except ValueError as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request_id)
             return self.create_error_response(str(e))
         except TypeError as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request_id)
             return self.create_error_response(str(e))
         except RuntimeError as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request_id)
             return self.create_error_response(str(e))
         except jinja2.TemplateError as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request_id)
             return self.create_error_response(str(e))
 
         # Extract data_parallel_rank from header (router can inject it)

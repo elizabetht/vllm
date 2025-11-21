@@ -168,9 +168,14 @@ class OpenAIServingChat(OpenAIServing):
         for the API specification. This API mimics the OpenAI
         Chat Completion API.
         """
+        # Generate request_id early so it's available for error logging
+        request_id = (
+            f"chatcmpl-{self._base_request_id(raw_request, request.request_id)}"
+        )
+
         error_check_ret = await self._check_model(request)
         if error_check_ret is not None:
-            logger.error("Error with model %s", error_check_ret)
+            logger.error("[%s] Error with model %s", request_id, error_check_ret)
             return error_check_ret
 
         # If the engine is dead, raise the engine's DEAD_ERROR.
@@ -206,6 +211,11 @@ class OpenAIServingChat(OpenAIServing):
             ):
                 # for hf tokenizers, "auto" tools requires
                 # --enable-auto-tool-choice and --tool-call-parser
+                logger.error(
+                    "[%s] Auto tool choice requires --enable-auto-tool-choice "
+                    "and --tool-call-parser to be set",
+                    request_id,
+                )
                 return self.create_error_response(
                     '"auto" tool choice requires '
                     "--enable-auto-tool-choice and --tool-call-parser to be set"
@@ -254,12 +264,8 @@ class OpenAIServingChat(OpenAIServing):
                     engine_prompts,
                 ) = self._make_request_with_harmony(request)
         except (ValueError, TypeError, RuntimeError, jinja2.TemplateError) as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request_id)
             return self.create_error_response(f"{e} {e.__cause__}")
-
-        request_id = (
-            f"chatcmpl-{self._base_request_id(raw_request, request.request_id)}"
-        )
 
         request_metadata = RequestResponseMetadata(request_id=request_id)
         if raw_request:
@@ -582,7 +588,7 @@ class OpenAIServingChat(OpenAIServing):
                     chat_template_kwargs=request.chat_template_kwargs,  # type: ignore
                 )
         except RuntimeError as e:
-            logger.exception("Error in reasoning parser creation.")
+            logger.exception("[%s] Error in reasoning parser creation.", request_id)
             data = self.create_streaming_error_response(str(e))
             yield f"data: {data}\n\n"
             yield "data: [DONE]\n\n"
@@ -596,7 +602,7 @@ class OpenAIServingChat(OpenAIServing):
             else:
                 tool_parsers = [None] * num_choices
         except Exception as e:
-            logger.exception("Error in tool parser creation.")
+            logger.exception("[%s] Error in tool parser creation.", request_id)
             data = self.create_streaming_error_response(str(e))
             yield f"data: {data}\n\n"
             yield "data: [DONE]\n\n"
@@ -1275,7 +1281,7 @@ class OpenAIServingChat(OpenAIServing):
 
         except Exception as e:
             # TODO: Use a vllm-specific Validation Error
-            logger.exception("Error in chat completion stream generator.")
+            logger.exception("[%s] Error in chat completion stream generator.", request_id)
             data = self.create_streaming_error_response(str(e))
             yield f"data: {data}\n\n"
         # Send the final done message after all response.n are finished
@@ -1298,9 +1304,11 @@ class OpenAIServingChat(OpenAIServing):
             async for res in result_generator:
                 final_res = res
         except asyncio.CancelledError:
+            logger.error("[%s] Client disconnected", request_id)
             return self.create_error_response("Client disconnected")
         except ValueError as e:
             # TODO: Use a vllm-specific Validation Error
+            logger.error("[%s] %s", request_id, str(e))
             return self.create_error_response(str(e))
 
         assert final_res is not None
@@ -1382,7 +1390,7 @@ class OpenAIServingChat(OpenAIServing):
                         chat_template_kwargs=request.chat_template_kwargs,  # type: ignore
                     )
                 except RuntimeError as e:
-                    logger.exception("Error in reasoning parser creation.")
+                    logger.exception("[%s] Error in reasoning parser creation.", request_id)
                     return self.create_error_response(str(e))
                 # If the reasoning parser is enabled,
                 # tool calls are extracted exclusively from the content.
@@ -1497,9 +1505,10 @@ class OpenAIServingChat(OpenAIServing):
             # undetermined case that is still important to handle
             else:
                 logger.error(
-                    "Error in chat_completion_full_generator - cannot determine"
+                    "[%s] Error in chat_completion_full_generator - cannot determine"
                     " if tools should be extracted. Returning a standard chat "
-                    "completion."
+                    "completion.",
+                    request_id,
                 )
                 message = ChatMessage(role=role, reasoning=reasoning, content=content)
             # In OpenAI's API, when a tool is called, the finish_reason is:

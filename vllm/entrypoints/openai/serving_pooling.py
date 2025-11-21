@@ -159,7 +159,7 @@ class OpenAIServingPooling(OpenAIServing):
             else:
                 raise ValueError(f"Unsupported request of type {type(request)}")
         except (ValueError, TypeError, jinja2.TemplateError) as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request_id)
             return self.create_error_response(str(e))
 
         # Schedule the request and get the result generator.

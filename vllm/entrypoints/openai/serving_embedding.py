@@ -102,7 +102,7 @@ class EmbeddingMixin(OpenAIServing):
                 )
             return None
         except (ValueError, TypeError) as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", ctx.request_id)
             return self.create_error_response(str(e))
 
     def _build_render_config(self, request: EmbeddingCompletionRequest) -> RenderConfig:

@@ -270,7 +270,7 @@ class OpenAIServingResponses(OpenAIServing):
     ):
         error_check_ret = await self._check_model(request)
         if error_check_ret is not None:
-            logger.error("Error with model %s", error_check_ret)
+            logger.error("[%s] Error with model %s", request.request_id, error_check_ret)
             return error_check_ret
         maybe_validation_error = self._validate_create_responses_input(request)
         if maybe_validation_error is not None:
@@ -322,7 +322,7 @@ class OpenAIServingResponses(OpenAIServing):
             jinja2.TemplateError,
             NotImplementedError,
         ) as e:
-            logger.exception("Error in preprocessing prompt inputs")
+            logger.exception("[%s] Error in preprocessing prompt inputs", request.request_id)
             return self.create_error_response(f"{e} {e.__cause__}")
 
         request_metadata = RequestResponseMetadata(request_id=request.request_id)
@@ -604,7 +604,9 @@ class OpenAIServingResponses(OpenAIServing):
             assert len(final_res.outputs) == 1
             final_output = final_res.outputs[0]
 
-            output = self._make_response_output_items(request, final_output, tokenizer)
+            output = self._make_response_output_items(
+                request, final_output, tokenizer, request.request_id
+            )
 
             # TODO: context for non-gptoss models doesn't use messages
             # so we can't get them out yet
@@ -759,12 +761,13 @@ class OpenAIServingResponses(OpenAIServing):
         request: ResponsesRequest,
         final_output: CompletionOutput,
         tokenizer: AnyTokenizer,
+        request_id: str,
     ) -> list[ResponseOutputItem]:
         if self.reasoning_parser:
             try:
                 reasoning_parser = self.reasoning_parser(tokenizer)
             except RuntimeError as e:
-                logger.exception("Error in reasoning parser creation.")
+                logger.exception("[%s] Error in reasoning parser creation.", request_id)
                 raise e
 
             reasoning, content = reasoning_parser.extract_reasoning(
