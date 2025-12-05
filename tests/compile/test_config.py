@@ -3,6 +3,7 @@
 import copy
 import logging
 from contextlib import nullcontext
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
