@@ -3,7 +3,6 @@
 import copy
 import logging
 from contextlib import nullcontext
-from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -107,69 +106,46 @@ def test_disable_compile_cache_config(vllm_runner, monkeypatch):
         pass
 
 
-def test_disable_compile_cache_env_var_override():
-    """Test that VLLM_DISABLE_COMPILE_CACHE env var overrides config option."""
-    # Test that env var overrides config when config says False
-    with patch.dict("os.environ", {"VLLM_DISABLE_COMPILE_CACHE": "1"}):
-        # Need to reload envs module to pick up the patched env var
-        import vllm.envs as envs
+@pytest.mark.parametrize(
+    "config_value,env_var_value,expected",
+    [
+        # Env var overrides config when config is False
+        (False, "1", True),
+        # Both config and env var disable cache
+        (True, "1", True),
+        # Config disables cache, env var not set
+        (True, None, True),
+        # Config enables cache, env var not set
+        (False, None, False),
+        # env var is set to 0, should be treated as not set, so config used
+        (True, "0", True),
+        (False, "0", False),
+    ],
+    ids=[
+        "env_var_overrides_config",
+        "both_disable_cache",
+        "config_disables_without_env_var",
+        "config_enables_without_env_var",
+    ],
+)
+def test_disable_compile_cache_config_and_env_var(
+    monkeypatch, config_value, env_var_value, expected
+):
+    """Test disable_compile_cache config and env var interaction."""
+    import vllm.envs as envs
 
-        # Force reload of the env var value
-        original_value = envs.VLLM_DISABLE_COMPILE_CACHE
-        envs.VLLM_DISABLE_COMPILE_CACHE = True
-        try:
-            config = VllmConfig(
-                compilation_config=CompilationConfig(disable_compile_cache=False)
-            )
-            # Env var should override to True
-            assert config.compilation_config.disable_compile_cache is True
-        finally:
-            envs.VLLM_DISABLE_COMPILE_CACHE = original_value
+    # Set or unset the env var using monkeypatch
+    if env_var_value is not None:
+        monkeypatch.setenv("VLLM_DISABLE_COMPILE_CACHE", "1")
+        monkeypatch.setattr(envs, "VLLM_DISABLE_COMPILE_CACHE", env_var_value)
+    else:
+        monkeypatch.delenv("VLLM_DISABLE_COMPILE_CACHE", raising=False)
+        monkeypatch.setattr(envs, "VLLM_DISABLE_COMPILE_CACHE", False)
 
-
-def test_disable_compile_cache_both_set():
-    """Test when both config and env var are set to disable cache."""
-    with patch.dict("os.environ", {"VLLM_DISABLE_COMPILE_CACHE": "1"}):
-        import vllm.envs as envs
-
-        original_value = envs.VLLM_DISABLE_COMPILE_CACHE
-        envs.VLLM_DISABLE_COMPILE_CACHE = True
-        try:
-            # Both config and env var say disable -> should be True
-            config = VllmConfig(
-                compilation_config=CompilationConfig(disable_compile_cache=True)
-            )
-            assert config.compilation_config.disable_compile_cache is True
-        finally:
-            envs.VLLM_DISABLE_COMPILE_CACHE = original_value
-
-
-def test_disable_compile_cache_config_without_env_var():
-    """Test that disable_compile_cache config works when env var is not set."""
-    with patch.dict("os.environ", {}, clear=False):
-        # Ensure VLLM_DISABLE_COMPILE_CACHE is not in env
-        import os
-
-        os.environ.pop("VLLM_DISABLE_COMPILE_CACHE", None)
-
-        import vllm.envs as envs
-
-        original_value = envs.VLLM_DISABLE_COMPILE_CACHE
-        envs.VLLM_DISABLE_COMPILE_CACHE = False
-        try:
-            # Config says True, env var not set -> should be True
-            config = VllmConfig(
-                compilation_config=CompilationConfig(disable_compile_cache=True)
-            )
-            assert config.compilation_config.disable_compile_cache is True
-
-            # Config says False, env var not set -> should be False
-            config2 = VllmConfig(
-                compilation_config=CompilationConfig(disable_compile_cache=False)
-            )
-            assert config2.compilation_config.disable_compile_cache is False
-        finally:
-            envs.VLLM_DISABLE_COMPILE_CACHE = original_value
+    config = VllmConfig(
+        compilation_config=CompilationConfig(disable_compile_cache=config_value)
+    )
+    assert config.compilation_config.disable_compile_cache is expected
 
 
 # forked needed to workaround https://github.com/vllm-project/vllm/issues/21073
