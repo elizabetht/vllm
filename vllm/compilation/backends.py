@@ -236,10 +236,15 @@ class CompilerManager:
             maybe_key = f"artifact_shape_{runtime_shape}_subgraph_{graph_index}"
 
         with self.compile_context(runtime_shape):
+            # Pass disable_compile_cache through to the compiler
+            compiler_config = additional_inductor_config.copy()
+            compiler_config["vllm_disable_compile_cache"] = (
+                self.compilation_config.disable_compile_cache
+            )
             compiled_graph, handle = self.compiler.compile(
                 graph,
                 example_inputs,
-                additional_inductor_config,
+                compiler_config,
                 runtime_shape,
                 maybe_key,
             )
@@ -247,7 +252,7 @@ class CompilerManager:
         assert compiled_graph is not None, "Failed to compile the graph"
 
         # store the artifact in the cache
-        if is_compile_cache_enabled(additional_inductor_config) and handle is not None:
+        if is_compile_cache_enabled(compiler_config) and handle is not None:
             self.cache[(runtime_shape, graph_index, self.compiler.name)] = handle
             compilation_counter.num_cache_entries_updated += 1
             self.is_cache_updated = True
@@ -649,8 +654,14 @@ class VllmBackend:
         os.makedirs(local_cache_dir, exist_ok=True)
         self.compilation_config.local_cache_dir = local_cache_dir
 
+        # Build a config dict for cache checking that includes the disable flag
+        cache_check_config = self.inductor_config.copy()
+        cache_check_config["vllm_disable_compile_cache"] = (
+            self.compilation_config.disable_compile_cache
+        )
+
         # Honors opt-outs such as CompilationMode.NONE or VLLM_DISABLE_COMPILE_CACHE.
-        disable_cache = not is_compile_cache_enabled(self.inductor_config)
+        disable_cache = not is_compile_cache_enabled(cache_check_config)
 
         if disable_cache:
             logger.info_once("vLLM's torch.compile cache is disabled.", scope="local")

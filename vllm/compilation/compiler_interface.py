@@ -169,12 +169,18 @@ def is_compile_cache_enabled(
     vllm_inductor_config_disable_cache = vllm_additional_inductor_config.get(
         "force_disable_caches", False
     )
+    # Check for vllm_disable_compile_cache which is set from CompilationConfig
+    # and resolved in VllmConfig.__post_init__ to account for
+    # VLLM_DISABLE_COMPILE_CACHE env var override.
+    vllm_disable_compile_cache = vllm_additional_inductor_config.get(
+        "vllm_disable_compile_cache", False
+    )
 
     # TODO(gmagogsfm): Replace torch._inductor.config.force_disable_caches
     # with torch.compiler.config.force_disable_caches when minimum PyTorch
     # version reaches 2.10
     return (
-        not envs.VLLM_DISABLE_COMPILE_CACHE
+        not vllm_disable_compile_cache
         and not torch._inductor.config.force_disable_caches
         and not vllm_inductor_config_disable_cache
     )
