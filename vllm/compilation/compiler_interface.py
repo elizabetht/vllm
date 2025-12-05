@@ -225,6 +225,12 @@ class InductorStandaloneAdaptor(CompilerInterface):
         current_config = {}
         if compiler_config is not None:
             current_config.update(compiler_config)
+
+        # Remove vllm-specific keys that are not valid inductor config options
+        # before passing to standalone_compile. These keys are used internally
+        # by vLLM for cache control but would cause AttributeError in torch._inductor.
+        current_config.pop("vllm_disable_compile_cache", None)
+
         set_inductor_config(current_config, runtime_shape)
         set_functorch_config()
 
@@ -330,6 +336,11 @@ class InductorAdaptor(CompilerInterface):
         current_config = {}
         if compiler_config is not None:
             current_config.update(compiler_config)
+
+        # Remove vllm-specific keys that are not valid inductor config options
+        # before passing to compile_fx. These keys are used internally by vLLM
+        # for cache control but would cause AttributeError in torch._inductor.
+        current_config.pop("vllm_disable_compile_cache", None)
 
         # disable remote cache
         current_config["fx_graph_cache"] = True
