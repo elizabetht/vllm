@@ -127,6 +127,23 @@ def test_disable_compile_cache_env_var_override():
             envs.VLLM_DISABLE_COMPILE_CACHE = original_value
 
 
+def test_disable_compile_cache_both_set():
+    """Test when both config and env var are set to disable cache."""
+    with patch.dict("os.environ", {"VLLM_DISABLE_COMPILE_CACHE": "1"}):
+        import vllm.envs as envs
+
+        original_value = envs.VLLM_DISABLE_COMPILE_CACHE
+        envs.VLLM_DISABLE_COMPILE_CACHE = True
+        try:
+            # Both config and env var say disable -> should be True
+            config = VllmConfig(
+                compilation_config=CompilationConfig(disable_compile_cache=True)
+            )
+            assert config.compilation_config.disable_compile_cache is True
+        finally:
+            envs.VLLM_DISABLE_COMPILE_CACHE = original_value
+
+
 def test_disable_compile_cache_config_without_env_var():
     """Test that disable_compile_cache config works when env var is not set."""
     with patch.dict("os.environ", {}, clear=False):
