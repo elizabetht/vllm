@@ -478,7 +478,7 @@ class MooncakeConnectorWorker:
             use_mla=self.use_mla,
         )
         self.backend_name = backend.get_name()
-        self.kv_cache_layout = get_kv_cache_layout()
+        self.kv_cache_layout = get_kv_cache_layout(self.cache_config)
         logger.debug("Detected attention backend %s", self.backend_name)
         logger.debug("Detected kv cache layout %s", self.kv_cache_layout)
 

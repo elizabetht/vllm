@@ -24,6 +24,7 @@ from vllm.config import VllmConfig, get_layers_from_vllm_config
 from vllm.utils.math_utils import cdiv
 
 if TYPE_CHECKING:
+    from vllm.config.cache import CacheConfig
     from vllm.v1.core.sched.output import SchedulerOutput
     from vllm.v1.worker.gpu_input_batch import InputBatch
 
@@ -400,31 +401,41 @@ class AttentionMetadataBuilder(abc.ABC, Generic[M]):
 
 
 @functools.lru_cache
-def get_kv_cache_layout():
+def get_kv_cache_layout(cache_config: "CacheConfig | None" = None) -> str:
     # Format specified by the code.
     global _KV_CACHE_LAYOUT_OVERRIDE
 
     if _KV_CACHE_LAYOUT_OVERRIDE is not None:
-        cache_layout = _KV_CACHE_LAYOUT_OVERRIDE
         logger.info_once(
             "`_KV_CACHE_LAYOUT_OVERRIDE` variable detected. "
             "Setting KV cache layout to %s.",
-            cache_layout,
+            _KV_CACHE_LAYOUT_OVERRIDE,
         )
-        return cache_layout
+        return _KV_CACHE_LAYOUT_OVERRIDE
 
-    # Format specified by the user.
-    cache_layout = envs.VLLM_KV_CACHE_LAYOUT
-    # When neither the user nor the override specified a layout, get default
+    # Format specified by the user via config.
+    cache_layout: str | None = None
+    if cache_config is not None:
+        cache_layout = cache_config.kv_cache_layout
+
+    # Fall back to environment variable if not in config (backward compatibility)
+    if cache_layout is None:
+        cache_layout = envs.VLLM_KV_CACHE_LAYOUT
+        if cache_layout is not None:
+            logger.info_once(
+                "VLLM_KV_CACHE_LAYOUT environment variable is deprecated and "
+                "will be removed in a future release. Please use the "
+                "--kv-cache-layout command-line argument instead. "
+                "Setting KV cache layout to %s.",
+                cache_layout,
+            )
+
+    # When neither config nor envvar specified a layout, get default
     if cache_layout is None:
         cache_layout = get_kv_connector_cache_layout()
     else:
         assert is_valid_kv_cache_layout(cache_layout)
-        logger.info_once(
-            "`VLLM_KV_CACHE_LAYOUT` environment variable "
-            "detected. Setting KV cache layout to %s.",
-            cache_layout,
-        )
+
     return cache_layout
 
 

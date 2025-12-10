@@ -137,7 +137,6 @@ run_tests_for_model() {
 
     # Build the command with or without model-specific args
     BASE_CMD="CUDA_VISIBLE_DEVICES=$GPU_ID \
-    VLLM_KV_CACHE_LAYOUT='HND' \
     UCX_NET_DEVICES=all \
     VLLM_NIXL_SIDE_CHANNEL_PORT=$SIDE_CHANNEL_PORT \
     vllm serve $model_name \
@@ -146,6 +145,7 @@ run_tests_for_model() {
     --block-size ${PREFILL_BLOCK_SIZE} \
     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
     --tensor-parallel-size $PREFILLER_TP_SIZE \
+    --kv-cache-layout HND \
     --kv-transfer-config '$KV_CONFIG'"
 
     if [ -n "$model_args" ]; then
@@ -179,7 +179,6 @@ run_tests_for_model() {
 
     # Build the command with or without model-specific args
     BASE_CMD="CUDA_VISIBLE_DEVICES=$GPU_ID \
-    VLLM_KV_CACHE_LAYOUT=$DECODER_KV_LAYOUT \
     UCX_NET_DEVICES=all \
     VLLM_NIXL_SIDE_CHANNEL_PORT=$SIDE_CHANNEL_PORT \
     vllm serve $model_name \
@@ -187,6 +186,7 @@ run_tests_for_model() {
     --enforce-eager \
     --block-size ${DECODE_BLOCK_SIZE} \
     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
+    --kv-cache-layout $DECODER_KV_LAYOUT \
     --kv-transfer-config '$KV_CONFIG'"
   
   # DP-EP attention mode

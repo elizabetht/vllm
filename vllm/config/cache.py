@@ -32,6 +32,7 @@ CacheDType = Literal[
 MambaDType = Literal["auto", "float32", "float16"]
 PrefixCachingHashAlgo = Literal["sha256", "sha256_cbor", "xxhash", "xxhash_cbor"]
 KVOffloadingBackend = Literal["native", "lmcache"]
+KVCacheLayout = Literal["NHD", "HND"]
 
 
 @config
@@ -158,6 +159,13 @@ class CacheConfig:
     """The backend to use for KV cache offloading. Supported backends include
     'native' (vLLM native CPU offloading), 'lmcache' This option must be used
     together with kv_offloading_size."""
+
+    kv_cache_layout: KVCacheLayout | None = None
+    """The memory layout for the KV cache. If not set, defaults will be
+    determined by the backend and platform. Available options:
+    - "NHD": (num_blocks, num_heads, block_size, head_dim)
+    - "HND": (num_heads, num_blocks, block_size, head_dim)
+    Some backends and platforms may require a specific layout."""
 
     def compute_hash(self) -> str:
         """
